@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<link rel="manifest" href="manifest.json">
+<title>زاي للعبايات – نظام الرواجع</title>
+<meta name="theme-color" content="#2f6f6a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="رواجع زاي">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+:root{
+  --bg:#f4f1ea; --surface:#fffdf8; --head:#2f6f6a; --head-text:#fff;
+  --line:#c9d3cf; --text:#26332f; --muted:#6b7a75; --accent:#2f6f6a;
+  --today:#e3f1ee; --weekend:#f3efe6; --ok:#2e9d6a;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#16201e; --surface:#1d2927; --head:#265a56; --head-text:#f1f7f5;
+    --line:#35514d; --text:#e6efec; --muted:#93a8a3; --accent:#6fc2b8;
+    --today:#24413d; --weekend:#202e2b; --ok:#4cc58c;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#16201e; --surface:#1d2927; --head:#265a56; --head-text:#f1f7f5;
+  --line:#35514d; --text:#e6efec; --muted:#93a8a3; --accent:#6fc2b8;
+  --today:#24413d; --weekend:#202e2b; --ok:#4cc58c;
+}
+*{box-sizing:border-box}
+html{height:100%;scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;height:100%;background:var(--bg);color:var(--text);
+  font-family:"Segoe UI",Tahoma,"Noto Naskh Arabic",Arial,sans-serif;display:flex;flex-direction:column}
+.top{display:flex;justify-content:space-between;align-items:center;gap:8px;
+  background:var(--head);color:var(--head-text);padding:12px 16px;flex:none}
+.top h1{margin:0;font-size:clamp(18px,4.5vw,26px);font-weight:700}
+.top .sys{font-size:clamp(14px,3.5vw,19px);opacity:.92;background:rgba(255,255,255,.15);
+  padding:5px 14px;border-radius:999px}
+.side{display:flex;align-items:center;gap:8px}
+.zoom{display:flex;align-items:center;gap:4px;background:rgba(255,255,255,.15);border-radius:999px;padding:2px 4px;font-size:13px}
+.zoom button{width:28px;height:28px;border:0;border-radius:50%;background:rgba(255,255,255,.25);color:inherit;font-size:18px;line-height:1;cursor:pointer;padding:0}
+.zoom span{min-width:38px;text-align:center;font-variant-numeric:tabular-nums}
+.wrap{touch-action:pan-x pan-y;flex:1;overflow:auto;-webkit-overflow-scrolling:touch}
+table{border-collapse:separate;border-spacing:0;width:100%;min-width:820px;table-layout:fixed;background:var(--surface)}
+th{position:sticky;top:0;z-index:5;background:var(--head);color:var(--head-text);
+  font-size:15px;padding:10px 6px;border-left:1px solid rgba(255,255,255,.35);
+  border-bottom:2px solid var(--line);text-align:center}
+td{border-left:1px solid var(--line);border-bottom:1px solid var(--line);vertical-align:top;padding:0;height:1px;background:var(--surface)}
+td:first-child,th:first-child{border-right:1px solid var(--line)}
+col.c-day{width:84px} col.c-date{width:108px}
+td.day,td.date{text-align:center;padding:10px 4px;font-size:15px;font-weight:600;white-space:nowrap}
+td.date{font-variant-numeric:tabular-nums;direction:ltr}
+tr.wk td{background:var(--weekend)}
+tr.today td{background:var(--today)}
+tr.today td.day,tr.today td.date{color:var(--accent)}
+.cell{position:relative;display:grid;height:100%;min-height:64px;padding:4px;cursor:text}
+.cell::after{content:attr(data-v);grid-area:1/1;white-space:pre-wrap;word-break:break-word;visibility:hidden;
+  font:inherit;font-size:15px;line-height:1.5;padding:6px 8px;border:1px solid transparent}
+.cell textarea{grid-area:1/1;display:block;width:100%;height:100%;border:1px solid transparent;border-radius:6px;background:transparent;
+  color:var(--text);font:inherit;font-size:15px;line-height:1.5;padding:6px 8px;resize:none;overflow:hidden;
+  white-space:pre-wrap;word-break:break-word;outline:none}
+.cell textarea:focus{border-color:var(--accent);background:var(--surface)}
+.cell.editing{padding-top:40px}
+.ok{display:none;position:absolute;top:5px;inset-inline-start:6px;width:30px;height:30px;border-radius:50%;
+  border:2px solid var(--ok);background:var(--surface);color:var(--ok);cursor:pointer;padding:0;
+  align-items:center;justify-content:center}
+.ok svg{width:18px;height:18px}
+.cell.editing .ok{display:flex}
+.cell.editing .hint{display:block}
+.hint{display:none;position:absolute;top:10px;inset-inline-start:44px;font-size:12px;color:var(--muted)}
+.cell.saved textarea{border-color:transparent}
+@media print{.ok,.hint{display:none!important}}
+</style>
+</head>
+<body>
+<header class="top">
+  <h1>زاي للعبايات</h1>
+  <div class="side">
+    <div class="zoom" role="group" aria-label="التكبير والتصغير">
+      <button type="button" id="zout" aria-label="تصغير">−</button>
+      <span id="zl">100%</span>
+      <button type="button" id="zin" aria-label="تكبير">+</button>
+    </div>
+    <div class="sys">نظام الرواجع</div>
+  </div>
+</header>
+<div class="wrap" id="wrap">
+<table>
+  <colgroup><col class="c-day"><col class="c-date"><col><col><col></colgroup>
+  <thead><tr>
+    <th>اليوم</th><th>التاريخ</th><th>الرواجع الخارجة من الشركة</th><th>الرواجع الواصلة للمخزن</th><th>الرواجع الغير مستلمة</th>
+  </tr></thead>
+  <tbody id="body"></tbody>
+</table>
+</div>
+<script>
+(function(){
+  var DAYS=["الأحد","الاثنين","الثلاثاء","الأربعاء","الخميس","الجمعة","السبت"];
+  var KEY="zay-returns-v1";
+  var store={};
+  try{ store=JSON.parse(localStorage.getItem(KEY)||"{}")||{}; }catch(e){ store={}; }
+  function persist(){ try{ localStorage.setItem(KEY,JSON.stringify(store)); }catch(e){} }
+
+  var CHECK='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+  function sync(t){ t.parentNode.setAttribute("data-v",t.value+"\n"); }
+
+  function makeCell(key,field){
+    var td=document.createElement("td");
+    var c=document.createElement("div"); c.className="cell";
+    var ok=document.createElement("button"); ok.type="button"; ok.className="ok"; ok.setAttribute("aria-label","حفظ"); ok.innerHTML=CHECK;
+    var hint=document.createElement("span"); hint.className="hint"; hint.textContent="اضغط ✓ للحفظ";
+    var ta=document.createElement("textarea"); ta.rows=1;
+    ta.value=(store[key]&&store[key][field])||"";
+    ta.addEventListener("input",function(){ c.classList.add("editing"); sync(ta); });
+    ta.addEventListener("focus",function(){ c.classList.add("editing"); });
+    ok.addEventListener("click",function(){
+      var v=ta.value.replace(/\s+$/,"");
+      ta.value=v;
+      if(!store[key]) store[key]={};
+      store[key][field]=v;
+      if(!store[key].out && !store[key].inn && !store[key].unr){ delete store[key]; }
+      persist(); sync(ta);
+      c.classList.remove("editing"); ta.blur();
+    });
+    c.appendChild(ok); c.appendChild(hint); c.appendChild(ta); td.appendChild(c);
+    sync(ta);
+    c.addEventListener("click",function(e){ if(!ok.contains(e.target)) ta.focus(); });
+    return {td:td,ta:ta};
+  }
+
+  var body=document.getElementById("body");
+  var frag=document.createDocumentFragment();
+  var start=Date.UTC(2026,10,17), end=Date.UTC(2028,0,1), DAY=86400000;
+  var now=new Date(); var todayUTC=Date.UTC(now.getFullYear(),now.getMonth(),now.getDate());
+  var todayRow=null, areas=[];
+  for(var t=start;t<=end;t+=DAY){
+    var d=new Date(t), dd=d.getUTCDate(), mm=d.getUTCMonth()+1, yy=d.getUTCFullYear(), wd=d.getUTCDay();
+    var key=yy+"-"+(mm<10?"0":"")+mm+"-"+(dd<10?"0":"")+dd;
+    var tr=document.createElement("tr");
+    if(wd===5) tr.className="wk";
+    if(t===todayUTC){ tr.className+=" today"; todayRow=tr; }
+    var tdDay=document.createElement("td"); tdDay.className="day"; tdDay.textContent=DAYS[wd];
+    var tdDate=document.createElement("td"); tdDate.className="date"; tdDate.textContent=dd+"/"+mm+"/"+yy;
+    var a=makeCell(key,"out"), b=makeCell(key,"inn"), u=makeCell(key,"unr");
+    areas.push(a.ta,b.ta,u.ta);
+    tr.appendChild(tdDay); tr.appendChild(tdDate); tr.appendChild(a.td); tr.appendChild(b.td); tr.appendChild(u.td);
+    frag.appendChild(tr);
+  }
+  body.appendChild(frag);
+  var tbl=document.querySelector("table"), zl=document.getElementById("zl"), z=1;
+  try{ z=parseFloat(localStorage.getItem("zay-zoom"))||1; }catch(e){}
+  function setZ(v){
+    z=Math.min(3,Math.max(0.4,Math.round(v*100)/100));
+    tbl.style.zoom=z; zl.textContent=Math.round(z*100)+"%";
+    try{ localStorage.setItem("zay-zoom",String(z)); }catch(e){}
+  }
+  document.getElementById("zin").addEventListener("click",function(){ setZ(z+0.1); });
+  document.getElementById("zout").addEventListener("click",function(){ setZ(z-0.1); });
+  setZ(z);
+  var wrapEl=document.getElementById("wrap"), pd=0, pz=1;
+  function dist(t){ var dx=t[0].clientX-t[1].clientX, dy=t[0].clientY-t[1].clientY; return Math.sqrt(dx*dx+dy*dy); }
+  wrapEl.addEventListener("touchstart",function(e){ if(e.touches.length===2){ pd=dist(e.touches); pz=z; } },{passive:true});
+  wrapEl.addEventListener("touchmove",function(e){
+    if(e.touches.length!==2||!pd) return;
+    e.preventDefault();
+    var r=wrapEl.getBoundingClientRect();
+    var cy=(e.touches[0].clientY+e.touches[1].clientY)/2-r.top;
+    var old=z, top=wrapEl.scrollTop, left=wrapEl.scrollLeft;
+    setZ(pz*dist(e.touches)/pd);
+    var k=z/old;
+    wrapEl.scrollTop=(top+cy)*k-cy;
+    wrapEl.scrollLeft=left*k;
+  },{passive:false});
+  wrapEl.addEventListener("touchend",function(e){ if(e.touches.length<2) pd=0; },{passive:true});
+  wrapEl.addEventListener("wheel",function(e){
+    if(!e.ctrlKey) return;
+    e.preventDefault();
+    setZ(z*(e.deltaY<0?1.08:0.92));
+  },{passive:false});
+  if(todayRow){
+    var wrap=document.getElementById("wrap");
+    wrap.scrollTop=todayRow.offsetTop-44;
+  }
+})();
+</script>
+<script>
+if("serviceWorker" in navigator){ window.addEventListener("load",function(){ try{ navigator.serviceWorker.register("sw.js").catch(function(){}); }catch(e){} }); }
+</script>
+</body>
+</html>
